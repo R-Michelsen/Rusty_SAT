@@ -9,7 +9,7 @@
             "type": "cppvsdbg",
             "request": "launch",
             "program": "${workspaceFolder}/target/debug/rusty_sat.exe",
-            "args": ["-f", "test.cnf"],
+            "args": ["-f", "test2.cnf"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/target/debug/",
             "environment": [],

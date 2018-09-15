@@ -1,32 +1,32 @@
 #![allow(dead_code)]
 
+
 use indexmap::IndexMap;
 use rand::prelude::*;
 
 pub struct ImplicationInformation {
     pub literal: u32,
     pub implied_by_vars: Vec<u32>,
-    pub implied_by_clause: Vec<u32>
+    pub implied_by_clause: Vec<u32>,
+    pub uniq_implication_point: bool
 }
 
-// pub struct ConflictInformation {
-//     pub caused_by_clause: Vec<u32>
-
-// }
-
 pub struct CNFFormula {
+    pub m_finished: bool,
     pub m_clauses: Vec<Vec<u32>>,
     pub m_variables: IndexMap<String, u32>,
     pub m_assignments: IndexMap<String, bool>,
     pub m_decision_level: i32,
-    pub m_implications: Vec<Vec<ImplicationInformation>>
+    pub m_decision_guesses: IndexMap<u32, i32>,
+    pub m_decision_level_implications: Vec<Vec<ImplicationInformation>>,
+    pub m_decision_level_assignments: Vec<IndexMap<String, bool>>
 }
 
 impl CNFFormula {
     pub fn add_clause(variables: &IndexMap<String, u32>, clause: Vec<String>) -> Vec<u32> {
         let mut literals: Vec<u32> = Vec::new();
 
-        println!("Clause: {:?}", clause);
+        //println!("Clause: {:?}", clause);
 
         for literal in clause {
             if literal.starts_with("-") {
@@ -39,15 +39,6 @@ impl CNFFormula {
 
         //println!("Literals: {:?}", literals);
         return literals;
-    }
-
-    pub fn add_conflict_cause(&mut self, literals: Vec<u32>) {
-        let mut literals_negation: Vec<u32> = Vec::new();
-        for literal in &literals {
-            literals_negation.push(literal ^ 1);
-        }
-
-        println!("Adding clause {:?} -> {:?}", literals, literals_negation);
     }
 
     pub fn new(clause_pile: Vec<Vec<String>>) -> CNFFormula {
@@ -77,15 +68,13 @@ impl CNFFormula {
 
         println!("Variables: {:?}\n", variables);
 
-        // Sort strings as if they were integers.
-        // variables.sort_unstable_by(|a: &String, b: &String| a.parse::<i32>().unwrap().cmp(&b.parse::<i32>().unwrap()));
-
-        // Delete duplicates.
-        // variables.dedup();
  
-        return CNFFormula{ m_clauses: clauses , m_variables: variables, 
+        return CNFFormula{ m_finished: false,
+                           m_clauses: clauses , m_variables: variables, 
                            m_assignments: IndexMap::new(), m_decision_level: -1,
-                           m_implications: Vec::new() };
+                           m_decision_guesses: IndexMap::new(),
+                           m_decision_level_implications: Vec::new(),
+                           m_decision_level_assignments: Vec::new() };
     } 
 
     pub fn lit_to_string(&self, literal: u32) -> String {
@@ -135,26 +124,34 @@ impl CNFFormula {
     }
 
     pub fn print_current_level_implications(&self) {
-        for imp_info in &self.m_implications[self.m_decision_level as usize] {
+        for imp_info in &self.m_decision_level_implications[self.m_decision_level as usize] {
             self.print_implications(&imp_info);
         }
     }
 
-    pub fn is_finished(&self) -> bool {
-        if self.m_assignments.len() == self.m_variables.len() {
-            println!("Solution:\n{:?}", self.m_assignments);
-            return true;
-        } else {
-            return false;
+    pub fn update_partial_clause(partial_clause: &Vec<u32>, current_clause: &Vec<u32>) -> Vec<u32> {
+        let mut new_partial_clause = Vec::new();
+
+        for &partial_literal in partial_clause {
+            if !current_clause.contains(&(partial_literal ^ 1)) {
+                new_partial_clause.push(partial_literal);
+            }
         }
-    }
 
-    pub fn analyze_conflict(&mut self, clause: &Vec<u32>) -> u32 {
+        for &literal in current_clause {
+            if !partial_clause.contains(&(literal ^ 1)) && !new_partial_clause.contains(&literal){
+                new_partial_clause.push(literal);
+            }
+        }
 
-        return 0;
+        return new_partial_clause;
     }
 
     pub fn make_decision(&mut self) {
+        self.m_decision_level += 1;
+        self.m_decision_level_implications.push(Vec::new());
+        self.m_decision_level_assignments.push(IndexMap::new());
+
         let mut rng = thread_rng();
         let mut index = rng.gen_range(0, self.m_variables.len());
         while self.m_assignments.contains_key(&self.m_variables.get_index(index)
@@ -167,37 +164,71 @@ impl CNFFormula {
         
         let rnd_bool = rng.gen();
 
+        // Push decision literal.
+        if rnd_bool {
+            self.m_decision_guesses.insert(*self.m_variables.get_index(index).unwrap().1 << 1, self.m_decision_level);
+            println!("Made decision {}", *self.m_variables.get_index(index).unwrap().1 << 1)
+        } else {
+            self.m_decision_guesses.insert(*self.m_variables.get_index(index).unwrap().1 << 1 | 1, self.m_decision_level);
+            println!("Made decision {}", *self.m_variables.get_index(index).unwrap().1 << 1 | 1)
+        }
+
+        
+
         self.m_assignments.insert(self.m_variables.get_index(index)
                                                   .unwrap()
                                                   .0
                                                   .to_string(), rnd_bool);
-
-        self.m_decision_level += 1;
-        self.m_implications.push(Vec::new());
+        
+        self.m_decision_level_assignments[self.m_decision_level as usize].insert(self.m_variables.get_index(index)
+                                                                            .unwrap()
+                                                                            .0
+                                                                            .to_string(), rnd_bool);
+   
     }
 
-    pub fn make_decision_fake(&mut self, decision: u32) {
+    pub fn make_decision_fake(&mut self, decision: u32, truthval: bool) {
+        self.m_decision_level += 1;
+        self.m_decision_level_implications.push(Vec::new());
+        self.m_decision_level_assignments.push(IndexMap::new());
+
+        // Push decision literal.
+        if truthval {
+            self.m_decision_guesses.insert(*self.m_variables.get_index(decision as usize).unwrap().1 << 1, self.m_decision_level);
+            println!("Made decision {}", *self.m_variables.get_index(decision as usize).unwrap().1 << 1)
+        } else {
+            self.m_decision_guesses.insert(*self.m_variables.get_index(decision as usize).unwrap().1 << 1 | 1, self.m_decision_level);
+            println!("Made decision {}", *self.m_variables.get_index(decision as usize).unwrap().1 << 1 | 1)
+        };
+
+
         self.m_assignments.insert(self.m_variables.get_index(decision as usize)
                                                     .unwrap()
                                                     .0
-                                                    .to_string(), true);
+                                                    .to_string(), truthval);
 
-        self.m_decision_level += 1;
-        self.m_implications.push(Vec::new());
+        self.m_decision_level_assignments[self.m_decision_level as usize].insert(self.m_variables.get_index(decision as usize)
+                                                                    .unwrap()
+                                                                    .0
+                                                                    .to_string(), truthval);
     }
 
-
-    // pub fn apply_unit_propagation(&mut self, clause: Vec<u32>) -> bool {
-
-    // }
-
     pub fn solve(&mut self) -> bool {
+
+        println!("{:?}", self.m_assignments);
+        println!("{:?}", self.m_decision_level_assignments);
+        //println!("{:?}", self.m_clauses);
+
         let mut literal_assignments: Vec<u32> = Vec::new();
 
         // For potential conflict
         let mut conflict = false;
-        let mut literals_negation: Vec<u32> = Vec::new();
+        let mut partial_learned_clause: Vec<u32> = Vec::new();
+        let mut sat_count = 0;
+        let mut bt_level = -1;
 
+        // UIP var
+        let mut propagate_count = 0;
 
         // Convert m_assignments into literal assignments.
         for (key, value) in &self.m_assignments {
@@ -209,51 +240,48 @@ impl CNFFormula {
             literal_assignments.push(self.m_variables.get(key).unwrap() << 1 | negate);
         }
 
+
         // Process clauses.
         for clause in &self.m_clauses {
             let mut free_literals: Vec<u32> = Vec::new();
             let mut implication_literals: Vec<u32> = Vec::new();
-
             let mut currently_sat = false;
+            
 
-            for literal in clause {
+            for literal in clause.clone() {
                 let mut free = true;          
                 for lit_assignment in &literal_assignments {
-                    // If literal is free, push to vector.
-                    if *literal == (lit_assignment ^ 1) {
+                    
+                    if literal == (lit_assignment ^ 1) {
                         free = false;
 
-                        implication_literals.push(*literal ^ 1);
+                        // If unit propagation can be made, this array contains the contradicting literals 
+                        // AKA the ones that imply the unit propagated.
+                        implication_literals.push(literal ^ 1);
                     }
-                    if literal == lit_assignment {
+                    if literal == *lit_assignment {
                         currently_sat = true;
-
-                        implication_literals.push(*literal ^ 1);
                     }
                 }
+
+                // If literal is free, push to vector.
                 if free {
-                    free_literals.push(*literal);
-                }
+                    free_literals.push(literal);
+                }     
             }
-            
-            // pub struct Propagated_Information {
-            //     pub variable: String,
-            //     pub literal: u32,
-            //     pub implied_by_vars: Vec<u32>,
-            //     pub implied_by_clause: Vec<u32>
-            // }
 
             // Now propagate
             if free_literals.len() == 1 && !currently_sat {
+                propagate_count += 1;
 
                 let implication_info = ImplicationInformation {
                     literal: free_literals[0],
                     implied_by_vars: implication_literals,
-                    implied_by_clause: clause.clone()
+                    implied_by_clause: clause.clone(),
+                    uniq_implication_point: false
                 };
 
-                //self.print_implications(&implication_info);
-                self.m_implications[self.m_decision_level as usize].push(implication_info);
+                self.m_decision_level_implications[self.m_decision_level as usize].push(implication_info);
 
                 let mut negated = false;
                 if free_literals[0] & 1 == 0 {
@@ -266,49 +294,98 @@ impl CNFFormula {
                                             .0
                                             .to_string(), negated);
 
-                return false;
+                // Also insert into decision level specific assignments.             
+                self.m_decision_level_assignments[self.m_decision_level as usize]
+                                .insert(self.m_variables.get_index((free_literals[0] >> 1) as usize)
+                                .unwrap()
+                                .0
+                                .to_string(), negated);
             }
-
-            //println!("{} - {} - {:?}", free_literals.len(), currently_sat, clause);
 
             //If there is a conflict, add the clause
             if free_literals.len() == 0 && !currently_sat {
-                println!("Conflict! CAUSED BY:");
-                println!("{:?}", self.lit_list_to_strings(clause.clone()));
-
-                self.analyze_conflict(&clause);
-
-                let mut partial_learned_clause = clause.clone();
-
-                self.print_current_level_implications();
-
-                println!("SÅ KOMMER DER SIDST IMPLIED CLAUSES HER:\n\n");
-                // FIX
-                while let Some(last_impl) = self.m_implications[self.m_decision_level as usize].pop() {
-                    self.print_implications(&last_impl);
-                }
-
-                println!("Variables:\n{:?}", self.m_variables);
-                println!("Assignments:\n{:?}", self.m_assignments);
-
-                // Create negation of literals, push onto m_clauses.
-                for literal in clause {
-                    literals_negation.push(*literal ^ 1);
-                }
-                //println!("Adding clause {:?} -> {:?}", clause, literals_negation);
-                
                 conflict = true;
+
+                // Start the partial learned clause by cloning the current clause.
+                partial_learned_clause = clause.clone();
+                println!("Conflict! {:?}", self.lit_list_to_strings(clause.clone()));
+
+                // FIND CLAUSE TO LEARN.
+                while let Some(last_impl) = self.m_decision_level_implications[self.m_decision_level as usize].pop() {
+                    partial_learned_clause = Self::update_partial_clause(&partial_learned_clause, &last_impl.implied_by_clause);
+
+                    // Count literals at current decision level that are in clause.
+                    let mut lit_count = 0;
+                    for p_lit in &partial_learned_clause {            
+                        if self.m_decision_level_assignments[self.m_decision_level as usize]
+                            .contains_key(&(*p_lit >> 2).to_string()) {
+                                lit_count += 1;
+                            }
+                    }
+
+                    // If there is only one literal from the current decision level left in the clause..
+                    // backtrack and learn clause.
+                    if lit_count == 1 {
+                        break;
+                    }              
+                }
+
+                // FIND BACKTRACK LEVEL (Highest decision level guess in new learned clause)
+                for guess in self.m_decision_guesses.iter() {
+                    if partial_learned_clause.contains(&(guess.0 ^ 1)) {
+                        bt_level = guess.1.clone();
+                    }
+                }
                 break;
-                // GO BACK TO PREVIOUS CONFLICT LEVEL
+            }
+
+            if currently_sat {
+                    sat_count += 1;
             }
         }
 
+        if propagate_count == 1 {
+            self.m_decision_level_implications[self.m_decision_level as usize].last_mut().unwrap().uniq_implication_point = true;
+            self.print_implications(self.m_decision_level_implications[self.m_decision_level as usize].last().unwrap());
+        }
 
         if conflict {
+            if bt_level == -1 {
+                println!("UNSAT");
+                self.m_finished = true;
+                return true;
+            }
             // Push conflict clause.
-            self.m_clauses.push(literals_negation);
-            self.m_assignments.clear();
+            self.m_clauses.push(partial_learned_clause);
+
+            let mut assignment_removal_count = 0;
+            for x in 0..(self.m_decision_level - bt_level) {
+                
+                // Add the amount of assignments in current decision level.
+                assignment_removal_count += self.m_decision_level_assignments[(self.m_decision_level - x) as usize].len();
+
+                // Pop off vectors from current decision level.
+                self.m_decision_guesses.pop();
+                self.m_decision_level_implications.pop();
+                self.m_decision_level_assignments.pop();
+            }
+
+            // Set decision level to backtrack level.
+            self.m_decision_level = bt_level;
+
+            // Remove amount of assignments calculated from assigments popped off earlier.
+            for _x in 0..assignment_removal_count {
+                self.m_assignments.pop();
+            }
+
         }
+
+        else if sat_count == self.m_clauses.len() {
+            println!("Solution:\n{:?}", self.m_assignments);
+            self.m_finished = true;
+        }
+
+
         return true;
     }
 }

@@ -54,20 +54,35 @@ fn main() -> Result<()> {
     }
 
     let mut cnf_formula = CNFFormula::new(clause_pile);
-    cnf_formula.make_decision_fake(4);
+
+    cnf_formula.make_decision_fake(3, false);
+    cnf_formula.make_decision_fake(6, false);
+    cnf_formula.make_decision_fake(8, false);
+    cnf_formula.make_decision_fake(0, false);
+
     cnf_formula.solve();
-    cnf_formula.make_decision_fake(0);
+    cnf_formula.solve();
+    cnf_formula.solve();
+    cnf_formula.solve();
+    cnf_formula.solve();
     cnf_formula.solve();
     cnf_formula.solve();
     cnf_formula.solve();
     cnf_formula.solve();
 
+    // loop {
+    //     while !cnf_formula.solve() {}
 
+    //     println!("Solve ran once");
 
-    // while !cnf_formula.is_finished() {
+    //     if cnf_formula.m_finished {
+    //         break;
+    //     }
+
     //     cnf_formula.make_decision();
-    //     while !cnf_formula.apply_unit_propagation() {}
     // }
+
+
 
     let end = PreciseTime::now();
     println!("\n\n{} seconds for whatever you did.", start.to(end));
