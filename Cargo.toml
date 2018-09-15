@@ -1,0 +1,10 @@
+[package]
+name = "rusty_sat"
+version = "0.1.0"
+authors = ["Rasmus"]
+
+[dependencies]
+clap = "~2.32"
+time = "0.1.40"
+indexmap = "1.0.1"
+rand = "0.5"
