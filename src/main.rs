@@ -53,34 +53,31 @@ fn main() -> Result<()> {
         }
     }
 
-    let mut cnf_formula = CNFFormula::new(clause_pile);
 
-    cnf_formula.make_decision_fake(3, false);
-    cnf_formula.make_decision_fake(6, false);
-    cnf_formula.make_decision_fake(8, false);
-    cnf_formula.make_decision_fake(0, false);
 
-    cnf_formula.solve();
-    cnf_formula.solve();
-    cnf_formula.solve();
-    cnf_formula.solve();
-    cnf_formula.solve();
-    cnf_formula.solve();
-    cnf_formula.solve();
-    cnf_formula.solve();
-    cnf_formula.solve();
+    //loop {
+        let mut cnf_formula = CNFFormula::new(clause_pile.clone());
+        loop {
+            cnf_formula.make_decision();
+            while !cnf_formula.solve() {}
+            if cnf_formula.m_finished { break; }
+        }
+    //}
+
+
+
+
+    // cnf_formula.make_decision_fake(3, false);
+    // cnf_formula.make_decision_fake(6, false);
+    // cnf_formula.make_decision_fake(8, false);
+    // cnf_formula.make_decision_fake(0, false);
 
     // loop {
     //     while !cnf_formula.solve() {}
-
-    //     println!("Solve ran once");
-
-    //     if cnf_formula.m_finished {
-    //         break;
-    //     }
-
+    //     if cnf_formula.m_finished { break; }
     //     cnf_formula.make_decision();
     // }
+
 
 
 
