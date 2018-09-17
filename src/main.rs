@@ -13,7 +13,6 @@ mod cnf_formula;
 use cnf_formula::CNFFormula;
 
 fn main() -> Result<()> {
-    let start = PreciseTime::now();
     let matches = App::new("Rusty SAT")
                     .arg(Arg::with_name("file")
                     .help("CNF formula as .cnf file")
@@ -53,15 +52,16 @@ fn main() -> Result<()> {
         }
     }
 
-        let mut cnf_formula = CNFFormula::new(clause_pile.clone());
-        loop {
-            if cnf_formula.m_decide_count % 50 == 0 { cnf_formula.restart(); }
-            cnf_formula.make_decision();
-            while !cnf_formula.solve() {}
-            if cnf_formula.m_finished { break; }
-        }
+    let start = PreciseTime::now();
+
+    let mut cnf_formula = CNFFormula::new(clause_pile.clone());   
+    loop {
+        cnf_formula.make_decision();
+        while !cnf_formula.solve() {}
+        if cnf_formula.m_finished { break; }
+    }
 
     let end = PreciseTime::now();
-    println!("\n\n{} seconds for whatever you did.", start.to(end));
+    println!("\nCNF Evaluated in {} seconds.", start.to(end).num_milliseconds() as f64 / 1000.0);
     Ok(())
 }
