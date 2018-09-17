@@ -40,7 +40,7 @@ fn main() -> Result<()> {
                                             .collect();
 
             assert_eq!(cnf_declaration.len(), 4, "Couldn't parse file, corrupt file or incompatible format.");
-            println!("Processing CNF Formula with {} variables and {} clauses\n",
+            println!("Processing CNF Formula with {} variables and {} clauses",
                     cnf_declaration[2], cnf_declaration[3]);
         }
 
@@ -53,33 +53,13 @@ fn main() -> Result<()> {
         }
     }
 
-
-
-    //loop {
         let mut cnf_formula = CNFFormula::new(clause_pile.clone());
         loop {
+            if cnf_formula.m_decide_count % 50 == 0 { cnf_formula.restart(); }
             cnf_formula.make_decision();
             while !cnf_formula.solve() {}
             if cnf_formula.m_finished { break; }
         }
-    //}
-
-
-
-
-    // cnf_formula.make_decision_fake(3, false);
-    // cnf_formula.make_decision_fake(6, false);
-    // cnf_formula.make_decision_fake(8, false);
-    // cnf_formula.make_decision_fake(0, false);
-
-    // loop {
-    //     while !cnf_formula.solve() {}
-    //     if cnf_formula.m_finished { break; }
-    //     cnf_formula.make_decision();
-    // }
-
-
-
 
     let end = PreciseTime::now();
     println!("\n\n{} seconds for whatever you did.", start.to(end));
