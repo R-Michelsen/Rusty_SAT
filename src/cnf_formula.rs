@@ -44,7 +44,6 @@ impl CNFFormula {
         let mut var_index = 0;
 
         for clause in clause_pile {
-            println!("Clause: {:?}", clause);
             for literal in clause.clone() {
                 if literal.starts_with("-") {
                     if !variables.contains_key(&literal.trim_matches('-').to_owned()) {
@@ -61,9 +60,6 @@ impl CNFFormula {
             }
             clauses.push(Self::add_clause(&variables, clause));
         }
-
-
-        println!("Variables: {:?}", variables);
  
         return CNFFormula{ m_decide_count: 1, m_finished: false,
                            m_clauses: clauses , m_variables: variables,
@@ -192,21 +188,12 @@ impl CNFFormula {
         let zero_or_one = rng.gen_range(0, 2);
 
         while self.m_assignments.contains_key(&((self.m_variables.get_index(index).unwrap().1.clone() << 1) | 1)) ||
-              self.m_assignments.contains_key(&(self.m_variables.get_index(index).unwrap().1.clone() << 1)) { //&&
-              //self.m_assignments.len() != self.m_variables.len() {
+              self.m_assignments.contains_key(&(self.m_variables.get_index(index).unwrap().1.clone() << 1)) {
             index = rng.gen_range(0, self.m_variables.len());
         }
 
         self.m_assignments.insert(*self.m_variables.get_index(index).unwrap().1 << 1 | zero_or_one, self.m_decision_level);
         self.m_decisions.push(*self.m_variables.get_index(index).unwrap().1 << 1 | zero_or_one);
-
-        // let implication_info = ImplicationInformation {
-        //     literal: *self.m_variables.get_index(index).unwrap().1 << 1,
-        //     implied_by_vars: Vec::new(),
-        //     implied_by_clause: Vec::new()
-        // };
-
-        // self.m_implications[self.m_decision_level as usize].push(implication_info);
     }
 
     pub fn make_decision_fake(&mut self, decision: u32, truthval: bool) {
@@ -244,9 +231,6 @@ impl CNFFormula {
     }
 
     pub fn solve(&mut self) -> bool {
-        println!();
-        self.print_assignments(&self.m_assignments);
-
         // For potential conflict
         let mut conflict = false;
         let mut conflict_clause: Vec<u32> = Vec::new();
@@ -256,8 +240,7 @@ impl CNFFormula {
         let mut sat_count = 0;
 
         // p variable
-        let mut p_true = false;
-        let mut p = u32::max_value();
+        let mut uip_true = false;
 
         // Process clauses.
         for clause in &self.m_clauses {
@@ -294,9 +277,6 @@ impl CNFFormula {
                     implied_by_clause: clause.clone(),
                 };
 
-                println!("Propagating variable {}", self.lit_to_string(implication_info.literal.clone()));
-                self.print_implications(&implication_info);
-
                 self.m_implications[self.m_decision_level as usize].push(implication_info);
                 self.m_assignments.insert(free_literals[0], self.m_decision_level);
 
@@ -306,8 +286,6 @@ impl CNFFormula {
 
             //If there is a conflict, add the clause
             if free_literals.len() == 0 && !currently_sat {
-                println!("Found conflict: {:?}", self.lit_list_to_strings(clause.clone()));
-
                 conflict = true;
 
                 if self.m_decision_level == 0 {
@@ -317,12 +295,7 @@ impl CNFFormula {
                 // Find learned clause, and UIP (Unique Implication Point) in the process.
                 conflict_clause = clause.clone();
 
-                //p = self.m_implications[self.m_decision_level as usize][0].literal ^ 1;
                 while let Some(last_impl) = self.m_implications[self.m_decision_level as usize].pop() {
-                //for last_impl in self.m_implications[self.m_decision_level as usize].iter().rev() {
-
-                    self.print_implications(&last_impl);
-
                     conflict_clause = Self::update_partial_clause(&conflict_clause, &last_impl.implied_by_clause);
 
 
@@ -330,39 +303,20 @@ impl CNFFormula {
                     let mut lit_count = 0;
                     for p_lit in &conflict_clause {
                         if self.assignments_find_at_decisionlevel(p_lit, &self.m_decision_level) {
-                            p = p_lit.clone();
                             lit_count += 1;
                         }
-                        // for (key, value) in &self.m_assignments {
-                        //     if value == &self.m_decision_level {
-                        //         if key == &(p_lit ^ 1) {
-                        //             lit_count += 1;
-                        //         }
-                        //         else if key == p_lit {
-                        //             lit_count += 1;
-                        //         }
-                        //     }
-                        // }
                     }
 
                     // If there is only one literal from the current decision level left in the clause we found UIP,
                     // backtrack to assertion level and learn clause.
                     if lit_count == 1 {
-                        p_true = true;
+                        uip_true = true;
                         break;
                     }
                 }
-
-                println!("______________________________________________________________________");
-                self.print_current_level_implications();
-                println!("______________________________________________________________________");
-                
-                println!("p is {}", self.lit_to_string(p.clone()));
-
     
-                if !p_true {
-                    println!("getting last decision:");
-                    p = self.m_decisions.last().unwrap().clone();
+                if !uip_true {
+                    let p = self.m_decisions.last().unwrap().clone();
                     let mut new_conf_clause = Vec::new();
                     for i in 0..conflict_clause.len() {
                         let dec_level = self.assignment_find_decision_level(&conflict_clause[i]);
@@ -381,11 +335,6 @@ impl CNFFormula {
                     conflict_clause = new_conf_clause;
                 }
 
-                println!("Literal assigned at conflict level: {}", p_true);
-
-
-                println!("Learned clause: {:?}", self.lit_list_to_strings(conflict_clause.clone()));
-
                 // Here, if conflict clause is one and the literal is of same decision level as current,
                 // set assertion level to 0 by convention.
                 if conflict_clause.len() == 1 {
@@ -401,24 +350,6 @@ impl CNFFormula {
                         },
                         None => {}
                     }
-                    // if self.m_assignments.contains_key(&conflict_clause[0]) {
-                    //     let lit_dec_level = self.m_assignments.get(&conflict_clause[0]).unwrap().clone();
-                    //     if lit_dec_level == 0 {
-                    //         a_level = -1;
-                    //     }
-                    //     else {
-                    //         a_level = 0;
-                    //     }
-                    // }
-                    // else if self.m_assignments.contains_key(&(conflict_clause[0] ^ 1)) {
-                    //     let lit_dec_level = self.m_assignments.get(&(conflict_clause[0] ^ 1)).unwrap().clone();
-                    //     if lit_dec_level == 0 {
-                    //         a_level = -1;
-                    //     }
-                    //     else {
-                    //         a_level = 0;
-                    //     }
-                    // }
                 }
                 else {
                     let mut max = -1;
@@ -426,7 +357,6 @@ impl CNFFormula {
 
                     for literal in &conflict_clause {
                         let lit_dec_level = self.assignment_find_decision_level(&literal);
-                        println!("LDL {:?}", lit_dec_level);
                         match lit_dec_level {
                             Some(x) => {
                                 if x > second_max {
@@ -438,39 +368,9 @@ impl CNFFormula {
                                         second_max = x;
                                     }
                                 }
-                                // if x > max { 
-                                //     second_max = max; 
-                                //     max = x;
-                                // } else if x > second_max {//if x != max && { whatcode
-                                //     second_max = x;
-                                // } 
                             },
                             None => {}
                         }
-                        // if self.m_assignments.contains_key(literal) {
-                        //     let lit_dec_level = self.m_assignments.get(literal).unwrap().clone();
-                        //     if lit_dec_level > second_max {
-                        //         if lit_dec_level > max {
-                        //             second_max = max;
-                        //             max = lit_dec_level
-                        //         } 
-                        //         else if lit_dec_level != max {
-                        //             second_max = lit_dec_level;
-                        //         }           
-                        //     }
-                        // }
-                        // else if self.m_assignments.contains_key(&(literal ^ 1)) {
-                        //     let lit_dec_level = self.m_assignments.get(&(literal ^ 1)).unwrap().clone();
-                        //     if lit_dec_level > second_max {
-                        //         if lit_dec_level > max {
-                        //             second_max = max;
-                        //             max = lit_dec_level
-                        //         } 
-                        //         else if lit_dec_level != max {
-                        //             second_max = lit_dec_level;
-                        //         }           
-                        //     }
-                        // }
                     }
 
                     // If there is only one decision level in clause.
@@ -489,7 +389,6 @@ impl CNFFormula {
 
 
                 }
-                println!("Assertion Level: {}", a_level);
                 break;
             }
             
@@ -513,16 +412,13 @@ impl CNFFormula {
                 }
             }
 
-            println!("Removing from {:?} @ dec_level {}", self.m_decisions, self.m_decision_level);
             for _i in 0..self.m_decision_level - a_level {
                 self.m_decisions.pop();
             }
-            println!("Result is {:?}", self.m_decisions);
-
 
             self.m_decision_level = a_level;
 
-            // Return so we can do solving...
+            // Return so we can propagate once more, before new decision.
             return false;
         }
         
