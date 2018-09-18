@@ -54,11 +54,46 @@ fn main() -> Result<()> {
 
     let start = PreciseTime::now();
 
-    let mut cnf_formula = CNFFormula::new(clause_pile.clone());   
+    // GO BACK TO FAKE SHIT AND FIGURE OUT WHY UR SHIT DOESNT WORK
+
+    let mut cnf_formula = CNFFormula::new(clause_pile.clone());
+
+    // cnf_formula.make_decision_fake(14, true); //11
+    // while !cnf_formula.solve() {}
+
+    // cnf_formula.make_decision_fake(4, true); //2
+    // while !cnf_formula.solve() {}
+
+    // cnf_formula.make_decision_fake(15, true); //11
+    // while !cnf_formula.solve() {}
+
+    // cnf_formula.make_decision_fake(18, true); //2
+    // while !cnf_formula.solve() {}
+
+    // cnf_formula.make_decision_fake(11, true); //13
+    // while !cnf_formula.solve() {}
+
+    // cnf_formula.make_decision_fake(3, false);
+    // while !cnf_formula.solve() {}
+
+    // cnf_formula.make_decision_fake(6, false);
+    // while !cnf_formula.solve() {}
+
+    // cnf_formula.make_decision_fake(8, false);
+    // while !cnf_formula.solve() {}
+
+    // cnf_formula.make_decision_fake(0, false);
+    // while !cnf_formula.solve() {}
+
+
     loop {
+        //if cnf_formula.m_decide_count % 500 == 0 { cnf_formula.restart(); }
+        //else { cnf_formula.make_decision(); }
         cnf_formula.make_decision();
         while !cnf_formula.solve() {}
         if cnf_formula.m_finished { break; }
+
+       // if cnf_formula.m_decide_count % 500 == 0 { cnf_formula.print_stats(); }
     }
 
     let end = PreciseTime::now();
